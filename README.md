@@ -76,24 +76,23 @@ They hold the cumulative prices of each token. Useful for calculating the averag
 This represents the constant that is used to determine the exchange rate between token pairs. It is determined by multiplying their reserves.
 
 #### Lock {#pair-lock}
-This section talks about the function and variable used to perform a lock on functions, preventing them from being called while their running (within the same transaction), in order to avoid reentrancy abuse
+This section talks about the function and variable used to perform a lock on functions, preventing them from being called while they are running (within the same transaction), in order to avoid reentrancy abuse
 
 ```solidity
-    uint private unlocked = 1;
+30 uint private unlocked = 1;
 ```
-An initial`unlocked` variable as part of the contract, we can prevent functions from being called while they are running (within the same transaction).
+The`unlocked` variable is initially set to true
 
 ```solidity
-    modifier lock() {
+31 modifier lock() {
 ```
 
-This function is a [modifier](https://docs.soliditylang.org/en/v0.8.3/contracts.html#function-modifiers), a function that wraps around a normal function to change its behavior is some way.
+This is called a function is a modifier, it wraps around a normal function to change its behavior
 
 ```solidity
-        require(unlocked == 1, 'UniswapV2: LOCKED');
-        unlocked = 0;
+32 require(unlocked == 1, 'UniswapV2: LOCKED');
+33 unlocked = 0;
 ```
-
 If `unlocked` is equal to one, set it to zero. If it is already zero revert the call, make it fail.
 
 ```solidity
