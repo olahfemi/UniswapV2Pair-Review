@@ -75,7 +75,7 @@ They hold the cumulative prices of each token. Useful for calculating the averag
 ```
 This represents the constant that is used to determine the exchange rate between token pairs. It is determined by multiplying their reserves.
 
-#### Lock {#pair-lock}
+#### Lock 
 This section talks about the function and variable used to perform a lock on functions, preventing them from being called while they are running (within the same transaction), in order to avoid reentrancy abuse
 
 ```solidity
@@ -86,54 +86,48 @@ The`unlocked` variable is initially set to true
 ```solidity
 31 modifier lock() {
 ```
-
 This is called a function is a modifier, it wraps around a normal function to change its behavior
 
 ```solidity
 32 require(unlocked == 1, 'UniswapV2: LOCKED');
 33 unlocked = 0;
 ```
-If `unlocked` is equal to one, set it to zero. If it is already zero revert the call, make it fail.
+If `unlocked` is equal to one, set it to zero. If it is already zero revert the call, make it fail
 
 ```solidity
-        _;
+34 _;
 ```
-
 In a modifier `_;` is the original function call (with all the parameters). Here it means that the function call only happens if `unlocked` was one when it was called, and while it is running the value of `unlocked` is zero.
 
 ```solidity
-        unlocked = 1;
-    }
+35      unlocked = 1;
+36 }
 ```
+After the main function returns, release the lock
 
-After the main function returns, release the lock.
-
-#### Misc. functions {#pair-misc}
+#### Miscellaneous functions
 
 ```solidity
-    function getReserves() public view returns (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) {
-        _reserve0 = reserve0;
-        _reserve1 = reserve1;
-        _blockTimestampLast = blockTimestampLast;
-    }
+38 function getReserves() public view returns (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) {
+39      _reserve0 = reserve0;
+40      _reserve1 = reserve1;
+41      _blockTimestampLast = blockTimestampLast;
+42 }
 ```
 
-This function provides callers with the current state of the exchange. Notice that Solidity functions [can return multiple values](https://docs.soliditylang.org/en/v0.8.3/contracts.html#returning-multiple-values).
+This function provides callers with the current state of the exchange
+```solidity
+44  function _safeTransfer(address token, address to, uint value) private {
+45      (bool success, bytes memory data) = token.call(abi.encodeWithSelector(SELECTOR, to, value));
+```
+This internal function transfers an amount of ERC20 tokens from the exchange to somebody else. `SELECTOR` specifies that the function we are calling is `transfer(address,uint)`.
+
+To avoid having to import an interface for the token function, the call was "manually" created using one of the ABI functions
 
 ```solidity
-    function _safeTransfer(address token, address to, uint value) private {
-        (bool success, bytes memory data) = token.call(abi.encodeWithSelector(SELECTOR, to, value));
+46 require(success && (data.length == 0 || abi.decode(data, (bool))), 'UniswapV2: TRANSFER_FAILED');
+47 }
 ```
-
-This internal function transfers an amount of ERC20 tokens from the exchange to somebody else. `SELECTOR` specifies that the function we are calling is `transfer(address,uint)` (see definition above).
-
-To avoid having to import an interface for the token function, we "manually" create the call using one of the [ABI functions](https://docs.soliditylang.org/en/v0.8.3/units-and-global-variables.html#abi-encoding-and-decoding-functions).
-
-```solidity
-        require(success && (data.length == 0 || abi.decode(data, (bool))), 'UniswapV2: TRANSFER_FAILED');
-    }
-```
-
 There are two ways in which an ERC-20 transfer call can report failure:
 
 1. Revert. If a call to an external contract reverts, then the boolean return value is `false`
@@ -141,88 +135,81 @@ There are two ways in which an ERC-20 transfer call can report failure:
 
 If either of these conditions happen, revert.
 
-#### Events {#pair-events}
+#### Events 
 
 ```solidity
-    event Mint(address indexed sender, uint amount0, uint amount1);
-    event Burn(address indexed sender, uint amount0, uint amount1, address indexed to);
+49 event Mint(address indexed sender, uint amount0, uint amount1);
+50 event Burn(address indexed sender, uint amount0, uint amount1, address indexed to);
 ```
 
 These two events are emitted when a liquidity provider either deposits liquidity (`Mint`) or withdraws it (`Burn`). In either case, the amounts of token0 and token1 that are deposited or withdrawn are part of the event, as well as the identity of the account that called us (`sender`). In the case of a withdrawal, the event also includes the target that received the tokens (`to`), which may not be the same as the sender.
 
 ```solidity
-    event Swap(
-        address indexed sender,
-        uint amount0In,
-        uint amount1In,
-        uint amount0Out,
-        uint amount1Out,
-        address indexed to
-    );
+51 event Swap(
+52      address indexed sender,
+53      uint amount0In,
+54      uint amount1In,
+55      uint amount0Out,
+56      uint amount1Out,
+57      address indexed to
+58 );
 ```
-
 This event is emitted when a trader swaps one token for the other. Again, the sender and the destination may not be the same.
 Each token may be either sent to the exchange, or received from it.
 
 ```solidity
-    event Sync(uint112 reserve0, uint112 reserve1);
+59 event Sync(uint112 reserve0, uint112 reserve1);
 ```
-
 Finally, `Sync` is emitted every time tokens are added or withdrawn, regardless of the reason, to provide the latest reserve information (and therefore the exchange rate).
 
-#### Setup Functions {#pair-setup}
+#### Setup Functions
 
 These functions are supposed to be called once when the new pair exchange is set up.
 
 ```solidity
-    constructor() public {
-        factory = msg.sender;
-    }
+61 constructor() public {
+62      factory = msg.sender;
+63 }
 ```
-
 The constructor makes sure we'll keep track of the address of the factory that created the pair. This information is required for `initialize` and for the factory fee (if one exists)
 
 ```solidity
-    // called once by the factory at time of deployment
-    function initialize(address _token0, address _token1) external {
-        require(msg.sender == factory, 'UniswapV2: FORBIDDEN'); // sufficient check
-        token0 = _token0;
-        token1 = _token1;
-    }
+65 // called once by the factory at time of deployment
+66 function initialize(address _token0, address _token1) external {
+67      require(msg.sender == factory, 'UniswapV2: FORBIDDEN'); // sufficient check
+68      token0 = _token0;
+69      token1 = _token1;
+70  }
 ```
-
 This function allows the factory (and only the factory) to specify the two ERC-20 tokens that this pair will exchange.
 
-#### Internal Update Functions {#pair-update-internal}
+#### Internal Update Functions
 
 ##### \_update
 
 ```solidity
-    // update reserves and, on the first call per block, price accumulators
-    function _update(uint balance0, uint balance1, uint112 _reserve0, uint112 _reserve1) private {
+72 // update reserves and, on the first call per block, price accumulators
+73 function _update(uint balance0, uint balance1, uint112 _reserve0, uint112 _reserve1) private {
 ```
-
 This function is called every time tokens are deposited or withdrawn.
 
 ```solidity
-        require(balance0 <= uint112(-1) && balance1 <= uint112(-1), 'UniswapV2: OVERFLOW');
+74 require(balance0 <= uint112(-1) && balance1 <= uint112(-1), 'UniswapV2: OVERFLOW');
 ```
-
 If either balance0 or balance1 (uint256) is higher than uint112(-1) (=2^112-1) (so it overflows & wraps back to 0 when converted to uint112) refuse to continue the \_update to prevent overflows. With a normal token that can be subdivided into 10^18 units, this means each exchange is limited to about 5.1\*10^15 of each tokens. So far that has not been a problem.
 
 ```solidity
-        uint32 blockTimestamp = uint32(block.timestamp % 2**32);
-        uint32 timeElapsed = blockTimestamp - blockTimestampLast; // overflow is desired
-        if (timeElapsed > 0 && _reserve0 != 0 && _reserve1 != 0) {
+75 uint32 blockTimestamp = uint32(block.timestamp % 2**32);
+76 uint32 timeElapsed = blockTimestamp - blockTimestampLast; // overflow is desired
+77 if (timeElapsed > 0 && _reserve0 != 0 && _reserve1 != 0) {
 ```
-
 If the time elapsed is not zero, it means we are the first exchange transaction on this block. In that case, we need to update the cost accumulators.
 
 ```solidity
-            // * never overflows, and + overflow is desired
-            price0CumulativeLast += uint(UQ112x112.encode(_reserve1).uqdiv(_reserve0)) * timeElapsed;
-            price1CumulativeLast += uint(UQ112x112.encode(_reserve0).uqdiv(_reserve1)) * timeElapsed;
-        }
+78 // * never overflows, and + overflow is desired
+79      price0CumulativeLast += uint(UQ112x112.encode(_reserve1).uqdiv(_reserve0)) * timeElapsed;
+80      price1CumulativeLast += uint(UQ112x112.encode(_reserve0).uqdiv(_reserve1)) * timeElapsed;
+81 }
 ```
 
 Each cost accumulator is updated with the latest cost (reserve of the other token/reserve of this token) times the elapsed time in seconds. To get an average price you read the cumulative price is two points in time, and divide by the time difference between them. For example, assume this sequence of events:
@@ -241,35 +228,32 @@ Let's say we want to calculate the average price of **Token0** between the times
 This price calculation is the reason we need to know the old reserve sizes.
 
 ```solidity
-        reserve0 = uint112(balance0);
-        reserve1 = uint112(balance1);
-        blockTimestampLast = blockTimestamp;
-        emit Sync(reserve0, reserve1);
-    }
+82      reserve0 = uint112(balance0);
+83      reserve1 = uint112(balance1);
+84      blockTimestampLast = blockTimestamp;
+85      emit Sync(reserve0, reserve1);
+86 }
 ```
-
 Finally, update the global variables and emit a `Sync` event.
 
 ##### \_mintFee
 
 ```solidity
-    // if fee is on, mint liquidity equivalent to 1/6th of the growth in sqrt(k)
-    function _mintFee(uint112 _reserve0, uint112 _reserve1) private returns (bool feeOn) {
+88 // if fee is on, mint liquidity equivalent to 1/6th of the growth in sqrt(k)
+89 function _mintFee(uint112 _reserve0, uint112 _reserve1) private returns (bool feeOn) {
 ```
-
 In Uniswap 2.0 traders pay a 0.30% fee to use the market. Most of that fee (0.25% of the trade) always goes to the liquidity providers. The remaining 0.05% can go either to the liquidity providers or to an address specified by the factory as a protocol fee, which pays Uniswap for their development effort.
 
 To reduce calculations (and therefore gas costs), this fee is only calculated when liquidity is added or removed from the pool, rather than at each transaction.
 
 ```solidity
-        address feeTo = IUniswapV2Factory(factory).feeTo();
-        feeOn = feeTo != address(0);
+90 address feeTo = IUniswapV2Factory(factory).feeTo();
+91 feeOn = feeTo != address(0);
 ```
-
-Read the fee destination of the factory. If it is zero then there is no protocol fee and no need to calculate it that fee.
+Read the fee destination of the factory. If it is zero then there is no protocol fee and no need to calculate it.
 
 ```solidity
-        uint _kLast = kLast; // gas savings
+92 uint _kLast = kLast; // gas savings
 ```
 
 The `kLast` state variable is located in storage, so it will have a value between different calls to the contract.
